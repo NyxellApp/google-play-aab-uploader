@@ -7,9 +7,12 @@ from datetime import datetime, timedelta
 import jwt
 import requests
 
+from tqdm import tqdm
+from tqdm.utils import CallbackIOWrapper
+
 ACCESS_TOKEN_LIFESPAN = timedelta(minutes=10)
 EDIT_ID_LIFESPAN = timedelta(minutes=10)
-REQUESTS_TIMEOUT = 300
+REQUESTS_TIMEOUT = 9000
 
 
 def check_response(response: requests.Response):
@@ -70,17 +73,21 @@ def obtain_edit_id(access_token: str, package_name: str) -> str:
 
 def upload_aab(access_token: str, aab_path: str, package_name: str, edit_id: str):
     print('uploading aab...')
+
+    file_size = os.stat(aab_path).st_size
+
     with open(aab_path, 'rb') as f:
-        data = f.read()
-    response = requests.post(
-        url=f'https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/{package_name}/edits/{edit_id}/bundles',
-        data=data,
-        headers={
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/octet-stream'
-        },
-        timeout=REQUESTS_TIMEOUT
-    )
+        with tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as t:
+            wrapped_file = CallbackIOWrapper(t.update, f, "read")
+            response = requests.post(
+                url=f'https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/{package_name}/edits/{edit_id}/bundles',
+                data=wrapped_file,
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/octet-stream'
+                },
+                timeout=REQUESTS_TIMEOUT
+            )
     check_response(response)
     uploaded_bundle = response.json()
     version_code = uploaded_bundle['versionCode']
