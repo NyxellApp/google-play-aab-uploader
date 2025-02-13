@@ -1,3 +1,7 @@
+"""
+Upload.py - Uploads .aab bundle to Google Play Store
+"""
+
 import argparse
 import json
 import os
@@ -16,15 +20,32 @@ REQUESTS_TIMEOUT = 9000
 
 
 def check_response(response: requests.Response):
+    """
+    check_response
+
+    Checks the response and exits with an error if the response is not OK
+
+    Parameters:
+        response: requests.Response
+    """
     if not response.ok:
         print(
             (f'FAILED: \'{response.request.method} {response.request.url}\' failed '
              f'with HTTP {response.status_code}:\n{response.text}'),
             file=sys.stderr)
-        exit(1)
+        sys.exit(1)
 
 
 def obtain_access_token(key_file: dict) -> str:
+    """
+    obtain_access_token
+
+    Obtains access token from Google Play Store using the provided key file
+
+    Parameters:
+        key_file: dict
+    
+    """
     print('obtaining access token...')
     exp = datetime.now() + ACCESS_TOKEN_LIFESPAN
     claim_set = {
@@ -55,6 +76,15 @@ def obtain_access_token(key_file: dict) -> str:
 
 
 def obtain_edit_id(access_token: str, package_name: str) -> str:
+    """
+    obtain_edit_id
+
+    Obtains the edit_id for the given package name
+
+    Parameters:
+        access_token: Access token to use for the request
+        package_name: Package name of the app
+    """
     print('obtaining edit_id...')
     expiry_time = (datetime.now() + EDIT_ID_LIFESPAN).strftime('%s')
     app_edit = {
@@ -72,6 +102,18 @@ def obtain_edit_id(access_token: str, package_name: str) -> str:
 
 
 def upload_aab(access_token: str, aab_path: str, package_name: str, edit_id: str):
+    """
+    upload_aab
+
+    Uploads the.aab bundle to Google Play Store
+
+    P
+    Parameters:
+        access_token: Access token to use for the request
+        aab_path: Path of.aab file to upload
+        package_name: Package name of the app
+        edit_id: Edit id obtained from obtain_edit_id()
+    """
     print('uploading aab...')
 
     file_size = os.stat(aab_path).st_size
@@ -96,6 +138,16 @@ def upload_aab(access_token: str, aab_path: str, package_name: str, edit_id: str
 
 
 def commit_edit(access_token: str, package_name: str, edit_id: str):
+    """
+    commit_edit
+
+    Commits the edit_id to Google Play Store.
+
+    Parameters:
+        access_token: Access token to use for the request
+        package_name: Package name of the app
+        edit_id: Edit id obtained from obtain_edit_id()
+    """
     print(f'commiting {edit_id=}...')
     response = requests.post(
         url=f'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/edits/{edit_id}:commit',
@@ -106,6 +158,9 @@ def commit_edit(access_token: str, package_name: str, edit_id: str):
 
 
 def main():
+    """
+    Main program
+    """
     parser = argparse.ArgumentParser(description="Google Play AAB uploader")
     parser.add_argument(
         '--key-path',
@@ -137,17 +192,17 @@ def main():
     if args.key_path:
         if not os.path.exists(args.key_path):
             print(f'key file does not exist: {args.key_path}', file=sys.stderr)
-            exit(1)
-        with open(args.key_path) as f:
+            sys.exit(1)
+        with open(args.key_path, encoding="utf-8") as f:
             key_file = json.load(f)
     elif args.key_json:
         key_file = json.loads(args.key_json)
     else:
-        print(f'--key-file or --key-json is required', file=sys.stderr)
-        exit(1)
+        print('--key-file or --key-json is required', file=sys.stderr)
+        sys.exit(1)
     if not os.path.exists(args.aab_path):
         print(f'aab file does not exist: {args.aab_path}', file=sys.stderr)
-        exit(1)
+        sys.exit(1)
     access_token = obtain_access_token(key_file)
     edit_id = obtain_edit_id(access_token, args.package_name)
     upload_aab(access_token, args.aab_path, args.package_name, edit_id)
